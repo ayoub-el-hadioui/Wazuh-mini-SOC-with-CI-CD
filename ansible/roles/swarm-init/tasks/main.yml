@@ -1,0 +1,8 @@
+- name: Initialize Docker Swarm (idempotent)
+  command: docker swarm init --advertise-addr {{ ansible_host }}
+  register: swarm_init
+  failed_when: false
+  changed_when: "'Error response' not in swarm_init.stderr"
+
+- debug:
+    msg: "Swarm already initialized or successfully initialized."

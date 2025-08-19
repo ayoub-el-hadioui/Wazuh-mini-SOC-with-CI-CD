@@ -1,0 +1,4 @@
+---
+- name: Teardown Wazuh stack
+  hosts: managers
+  become: yes

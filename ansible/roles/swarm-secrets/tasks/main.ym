@@ -1,0 +1,5 @@
+- name: Push Wazuh admin password secret
+  docker_secret:
+    name: wazuh_password
+    secret: "{{ wazuh_admin_password }}"
+    state: present

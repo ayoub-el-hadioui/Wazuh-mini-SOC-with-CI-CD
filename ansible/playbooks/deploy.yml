@@ -1,0 +1,17 @@
+---
+- name: Deploy Wazuh to Docker Swarm
+  hosts: managers
+  become: yes
+  gather_facts: false
+
+  pre_tasks:
+    - name: Ensure python3-docker is present (for docker_* modules)
+      ansible.builtin.package:
+        name: python3-docker
+        state: present
+
+  roles:
+    - role: swarm-init
+    - role: swarm-networks
+    - role: swarm-secrets
+    - role: stack-deploy

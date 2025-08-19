@@ -1,0 +1,9 @@
+traefik:
+  domain_name: "{{ lookup('env','DOMAIN_NAME') | default('wazuh.local') }}"
+  acme_email: "{{ lookup('env','ACME_EMAIL') | default('admin@example.com') }}"
+  acme_staging: "{{ lookup('env','ACME_STAGING') | default('true') }}"
+
+wazuh:
+  dashboard_password: "{{ lookup('file', '../../.secrets/dashboard_password.txt') | default('TestP@ssw0rd', true) }}"
+  api_password: "{{ lookup('file', '../../.secrets/wazuh_api_password.txt') | default('APITestP@ss', true) }}"
+

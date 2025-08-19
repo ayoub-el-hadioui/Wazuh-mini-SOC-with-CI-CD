@@ -1,0 +1,10 @@
+<group name="sshd,">
+  <rule id="100001" level="12">
+    <if_matched_sid>5710</if_matched_sid> <!-- Failed login -->
+    <if_matched_sid>5700</if_matched_sid> <!-- Success -->
+    <description>Suspicious SSH: multiple failures then success with new user</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+</group>

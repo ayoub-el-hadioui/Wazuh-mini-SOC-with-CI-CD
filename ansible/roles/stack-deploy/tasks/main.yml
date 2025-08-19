@@ -1,0 +1,6 @@
+- name: Deploy Wazuh stack
+  docker_stack:
+    state: present
+    name: wazuh
+    compose:
+      - "{{ playbook_dir }}/../../stack/wazuh-stack.yml"

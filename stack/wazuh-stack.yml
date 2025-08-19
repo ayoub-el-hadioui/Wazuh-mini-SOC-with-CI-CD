@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--providers.docker.swarmMode=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - wazuh-net
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  wazuh.manager:
+    image: wazuh/wazuh-manager:latest
+    networks:
+      - wazuh-net
+    volumes:
+      - manager_data:/var/ossec/data
+    secrets:
+      - wazuh_password
+    deploy:
+      replicas: 1
+
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:latest
+    networks:
+      - wazuh-net
+    volumes:
+      - indexer_data:/var/lib/wazuh-indexer
+    deploy:
+      replicas: 1
+
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:latest
+    networks:
+      - wazuh-net
+    deploy:
+      replicas: 1
+
+volumes:
+  traefik_letsencrypt:
+  manager_data:
+  indexer_data:
+
+networks:
+  wazuh-net:
+    driver: overlay
+
+secrets:
+  wazuh_password:
+    external: true

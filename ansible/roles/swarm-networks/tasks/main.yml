@@ -1,0 +1,6 @@
+- name: Create overlay network for Wazuh
+  docker_network:
+    name: wazuh-net
+    driver: overlay
+    scope: swarm
+    state: present

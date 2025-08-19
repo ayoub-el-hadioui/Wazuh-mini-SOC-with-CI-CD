@@ -1,0 +1,98 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  build_scan_test:
+    runs-on: self-hosted
+    env:
+      TRIVY_EXIT_CODE: "1"  # fail when vulns match severity
+      TRIVY_SEVERITY: "HIGH,CRITICAL"
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+      ACME_EMAIL: ${{ secrets.TRAEFIK_ACME_EMAIL }}
+      ACME_STAGING: ${{ secrets.ACME_STAGING }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Login (optional registry)
+        if: env.DOCKERHUB_USERNAME != ''
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build images
+        run: |
+          docker buildx build --load -t local/wazuh-dashboard:ci ./docker/wazuh-dashboard || true
+
+      - name: Trivy Scan (local images and stack refs)
+        run: |
+          trivy image --exit-code $TRIVY_EXIT_CODE --severity $TRIVY_SEVERITY local/wazuh-dashboard:ci || true
+          trivy config --exit-code $TRIVY_EXIT_CODE --severity $TRIVY_SEVERITY -f table -q ./stack
+        continue-on-error: false
+
+      - name: Prepare test Python env
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -r tests/selenium/requirements.txt
+          pip install -r tests/api/requirements.txt || true
+
+      - name: Run Selenium tests against existing TEST env or domain
+        env:
+          TEST_BASE_URL: https://${{ secrets.DOMAIN_NAME }}
+          TEST_USERNAME: testuser
+          TEST_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: |
+          source .venv/bin/activate
+          pytest -vv tests/selenium/test_dashboard.py
+
+      - name: Run API Health Test
+        env:
+          WAZUH_API_URL: https://${{ secrets.DOMAIN_NAME }}/api
+          WAZUH_API_USER: testapi
+          WAZUH_API_PASSWORD: ${{ secrets.WAZUH_API_PASSWORD }}
+        run: |
+          source .venv/bin/activate
+          pytest -vv tests/api/test_wazuh_api.py
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: [ build_scan_test ]
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Write transient secret files
+        run: |
+          mkdir -p .secrets
+          printf "%s" "${{ secrets.DASHBOARD_PASSWORD }}" > .secrets/dashboard_password.txt
+          printf "%s" "${{ secrets.WAZUH_API_PASSWORD }}" > .secrets/wazuh_api_password.txt
+
+      - name: Ansible Deploy
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          SWARM_MANAGER_HOSTS: ${{ secrets.SWARM_MANAGER_HOSTS }}
+          DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+          ACME_EMAIL: ${{ secrets.TRAEFIK_ACME_EMAIL }}
+          ACME_STAGING: ${{ secrets.ACME_STAGING }}
+        run: |
+          ansible-playbook -i ansible/inventories/prod/hosts.ini ansible/playbooks/deploy.yml \
+            --extra-vars "domain_name=$DOMAIN_NAME acme_email=$ACME_EMAIL acme_staging=$ACME_STAGING" -vv
+
+      - name: Cleanup transient files
+        if: always()
+        run: rm -rf .secrets
