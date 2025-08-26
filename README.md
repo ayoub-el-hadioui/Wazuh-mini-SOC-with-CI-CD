@@ -30,14 +30,6 @@ The setup follows the SOC Architect Challenge requirements.
 ---
 
 ## 📂 Repo Structure
-ansible/ # Playbooks, inventories, roles
-stack/ # Docker Swarm stack (wazuh-stack.yml, traefik config)
-configs/ # Proxy & TLS configs
-rules/ # Custom Wazuh decoders & rules
-tests/ # Selenium & API tests
-trivy/ # Policies & config for scans
-security/ # TLS/Secrets automation
-scripts/ # Helper scripts
 
 ---
 
