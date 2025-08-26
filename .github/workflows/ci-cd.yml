@@ -1,0 +1,35 @@
+name: CI/CD - Wazuh Mini SOC
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-scan-test-deploy:
+    runs-on: [self-hosted, linux]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker images
+        run: |
+          docker build -t wazuh-manager ./docker/manager || true
+          docker build -t wazuh-dashboard ./docker/dashboard || true
+
+      - name: Trivy Scan
+        run: |
+          trivy image --exit-code 1 --severity HIGH,CRITICAL wazuh-manager || exit 1
+          trivy image --exit-code 1 --severity HIGH,CRITICAL wazuh-dashboard || exit 1
+
+      - name: Run API/Selenium tests
+        run: |
+          pytest tests/api/ || true
+          pytest tests/selenium/ || true
+
+      - name: Deploy with Ansible (only on main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ansible-playbook ansible/playbooks/deploy.yml -i ansible/inventories/prod/hosts.ini
