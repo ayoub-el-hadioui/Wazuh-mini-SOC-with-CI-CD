@@ -15,6 +15,16 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - traefik_letsencrypt:/letsencrypt
+    secrets:
+      - tls_cert
+      - tls_key
+    command:
+      - "--providers.docker.swarmMode=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.websecure.http.tls.certificates[0].certFile=/run/secrets/tls_cert"
+      - "--entrypoints.websecure.http.tls.certificates[0].keyFile=/run/secrets/tls_key"
+
     networks:
       - wazuh-net
     deploy:
@@ -59,4 +69,8 @@ networks:
 
 secrets:
   wazuh_password:
+    external: true
+  tls_cert:
+    external: true
+  tls_key:
     external: true
